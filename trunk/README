@@ -6,11 +6,7 @@ is inspired by scanlogd {http://www.openwall.com/scanlogd}.
 
 Author(s)
 ---------
-The author of pyscanlogd is Anand B Pillai, <abpillai@gmail.com>.
-
-Copyright
----------
-All code is Copyright(C) 2010, Anand B Pillai.
+The author of pyscanlogd is "pythonhacker" (abpillai@gmail.com)
 
 Licensing
 ---------

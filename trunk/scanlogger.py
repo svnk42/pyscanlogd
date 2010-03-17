@@ -12,7 +12,6 @@ Features
 3. Detects SCTP scan.
 4. Detects slow port-scans also.
 
-Author: Anand B Pillai <abpillai at gmail dot com>
 Licensed under GNU GPL v3.0.
 
 """
@@ -28,10 +27,10 @@ import optparse
 import entry
 import timerlist
 
-__author__ = "Anand B Pillai"
-__maintainer__ = "Anand B Pillai"
+__author__ = "pythonhacker"
+__maintainer__ = "pythonhacker"
 __version__ = 0.5
-__modified__ = "Fri Mar 12 16:05:21 IST 2010"
+__modified__ = "Fri Mar 12 16:05:21 CET 2010"
 
 # UDP - in progress...
 
