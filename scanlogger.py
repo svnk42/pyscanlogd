@@ -189,7 +189,7 @@ class ScanLogger(object):
         # Sure scan
         is_scan = ((slow_scan and scan.weight >= self.threshold_l) or (not slow_scan and scan.weight >= self.threshold))
         # Possible scan
-        maybe_scan = (len(scan.ports)>=3 and len(scan.timediffs)>=4 and (scan.weight < self.threshold_l))
+        maybe_scan = (slow_scan and len(scan.ports)>=3 and len(scan.timediffs)>=4 and (scan.weight < self.threshold_l))
         
         if is_scan or maybe_scan:
             scan.logged = True
@@ -388,7 +388,16 @@ class ScanLogger(object):
         try:
             print 'listening on %s: %s' % (pc.name, pc.filter)
             for ts, pkt in pc:
-                self.process(decode(pkt))
+                # print ts, pkt
+                 eth = dpkt.ethernet.Ethernet(pkt)
+                 ip = eth.data
+    
+                 if ip.__class__==dpkt.ip.IP:
+                     src_ip = socket.inet_ntoa(ip.src)
+                     dst_ip = socket.inet_ntoa(ip.dst)
+                     print src_ip, dst_ip
+                     
+                 self.process(decode(pkt))
         except KeyboardInterrupt:
             if not self.daemon:
                 nrecv, ndrop, nifdrop = pc.stats()
