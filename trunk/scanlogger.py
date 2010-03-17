@@ -231,7 +231,13 @@ class ScanLogger(object):
                         # for d in dummy_scans:
                         #    self.recent_scans.remove(d)
                     else:
-                        scan.type = self.scan_types.get(scan.flags_or,'unknown')
+                        # Remove entry
+                        if slow_scan:
+                            del self.long_scans[scan.hash]
+                        else:
+                            del self.scans[scan.hash]
+                        
+                        return False
                 else:
                     scan.type = self.scan_types.get(scan.flags_or,'unknown')                    
                     # If this is a syn scan, see if there was a recent idle scan
@@ -388,16 +394,7 @@ class ScanLogger(object):
         try:
             print 'listening on %s: %s' % (pc.name, pc.filter)
             for ts, pkt in pc:
-                # print ts, pkt
-                 eth = dpkt.ethernet.Ethernet(pkt)
-                 ip = eth.data
-    
-                 if ip.__class__==dpkt.ip.IP:
-                     src_ip = socket.inet_ntoa(ip.src)
-                     dst_ip = socket.inet_ntoa(ip.dst)
-                     print src_ip, dst_ip
-                     
-                 self.process(decode(pkt))
+                self.process(decode(pkt))
         except KeyboardInterrupt:
             if not self.daemon:
                 nrecv, ndrop, nifdrop = pc.stats()
