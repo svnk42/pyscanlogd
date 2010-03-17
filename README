@@ -48,5 +48,6 @@ Daemonizing...
 $ listening on eth0: 
 
 Currently there is no option to a specific interface.
-By default pyscanlogd listens to the active interface.
+By default pyscanlogd listens to the active interface
+in promiscous mode.
 
