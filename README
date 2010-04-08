@@ -1,6 +1,6 @@
 Introduction
 ------------
-This package provides "PyScanLogd", a port-scanning 
+This package provides "Pyscanlogd", a port-scanning 
 detection tool entirely written in Python. PyScanLog
 is inspired by scanlogd {http://www.openwall.com/scanlogd}.
 
@@ -10,7 +10,7 @@ The author of pyscanlogd is "pythonhacker" (python.thehacker@gmail.com)
 
 Licensing
 ---------
-The code is released under GNU GPL v3.0. See file LICENSE.
+The code is released under GNU GPL v2.0. See file LICENSE.
 
 Requirements
 ------------
