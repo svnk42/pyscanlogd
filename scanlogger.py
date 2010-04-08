@@ -12,6 +12,13 @@ Features
 3. Detects SCTP scan.
 4. Detects slow port-scans also.
 
+Modification History
+
+Mar 17 2010  - Cleaned up code to publish to google.
+Apr 8 2010   - Better detection of TCP full-connect scan without
+               spurious and incorrect logging. Better logging
+               functions.
+
 Licensed under GNU GPL v3.0.
 
 """
@@ -52,7 +59,10 @@ UDP=dpkt.udp.UDP
 SCTP=dpkt.sctp.SCTP
 
 get_timestamp = lambda : time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+ip2quad = lambda x: socket.inet_ntoa(struct.pack('I', x))
+scan_ip2quad = lambda scan: map(ip2quad, [scan.src, scan.dst])
 
+    
 class ScanLogger(object):
     """ Port scan detector/logger """
     
@@ -61,11 +71,15 @@ class ScanLogger(object):
                   TH_FIN: 'TCP fin',
                   TH_SYN: 'TCP syn', TH_SYN|TH_RST: 'TCP syn',
                   TH_ACK: 'TCP ack',
-                  TH_URG|TH_PSH|TH_FIN: 'TCP x-mas', TH_URG|TH_PSH|TH_FIN|TH_ACK: 'TCP x-mas',
+                  TH_URG|TH_PSH|TH_FIN: 'TCP x-mas',
+                  TH_URG|TH_PSH|TH_FIN|TH_ACK: 'TCP x-mas',
                   TH_SYN|TH_FIN: 'TCP syn/fin',
                   TH_FIN|TH_ACK: 'TCP fin/ack',
-                  TH_SYN|TH_ACK|TH_RST: 'TCP full-connect',
-                  TH_URG|TH_PSH|TH_ACK|TH_RST|TH_SYN|TH_FIN: 'TCP all-flags' } 
+                  TH_SYN|TH_ACK: 'TCP full-connect',
+                  TH_URG|TH_PSH|TH_ACK|TH_RST|TH_SYN|TH_FIN: 'TCP all-flags',
+                  TH_SYN|TH_ACK|TH_RST: 'TCP full-connect',                                    
+                  # Not a scan
+                  TH_RST|TH_ACK: 'reply'} 
                   
     def __init__(self, timeout, threshold, maxsize, daemon=True, logfile='/var/log/scanlog'):
         self.scans = entry.EntryLog(maxsize)
@@ -83,8 +97,9 @@ class ScanLogger(object):
         # Log file
         try:
             self.scanlog = open(logfile,'a')
+            print >> sys.stderr, 'Scan logs will be saved to %s' % logfile
         except (IOError, OSError), (errno, strerror):
-            print "Error opening scan log file %s => %s" % (logfile, strerror)
+            print >> sys.stderr, "Error opening scan log file %s => %s" % (logfile, strerror)
             self.scanlog = None
             
         # Recent scans - this list allows to keep scan information
@@ -128,45 +143,53 @@ class ScanLogger(object):
 
         return self.hash_func(self.mix(src, dst, 0xffffff))
 
+    def log(self, msg):
+        """ Log a message to console and/or log file """
+
+        line = '[%s]: %s' % (get_timestamp(), msg)
+        if self.scanlog:
+            self.scanlog.write(line + '\n')
+            self.scanlog.flush()
+            
+        if not self.daemon:
+            print >> sys.stderr, line
+        
     def log_scan(self, scan, continuation=False, slow_scan=False, unsure=False):
         """ Log the scan to file and/or console """
 
-        srcip, dstip = socket.inet_ntoa(struct.pack('I',scan.src)), socket.inet_ntoa(struct.pack('I',scan.dst))
+        srcip, dstip = scan_ip2quad(scan)
         ports = ','.join([str(port) for port in scan.ports])
         
         if not continuation:
-            tup = [get_timestamp(),scan.type,scan.flags_or,srcip,dstip, ports]
+            tup = [scan.type,scan.flags_or,srcip,dstip, ports]
             
             if not slow_scan:
                 if scan.type != 'Idle':
-                    line = '[%s]: %s scan (flags:%d) from %s to %s (ports:%s)'
+                    line = '%s scan (flags:%d) from %s to %s (ports:%s)'
                 else:
-                    tup.append(socket.inet_ntoa(struct.pack('I',scan.zombie)))
-                    line = '[%s]: %s scan (flags: %d) from %s to %s (ports: %s) using zombie host %s'                    
+                    tup.append(ip2quad(scan.zombie))
+                    line = '%s scan (flags: %d) from %s to %s (ports: %s) using zombie host %s'                    
             else:
                 tup.append(scan.time_avg)                    
                 if unsure:
-                    line = '[%s]: Possible slow %s scan (flags:%d) from %s to %s (ports:%s), average timediff %.2fs'
+                    line = 'Possible slow %s scan (flags:%d) from %s to %s (ports:%s), average timediff %.2fs'
                 else:
-                    line = '[%s]: Slow %s scan (flags:%d) from %s to %s (ports:%s), average timediff %.2fs'                    
+                    line = 'Slow %s scan (flags:%d) from %s to %s (ports:%s), average timediff %.2fs'                    
         else:
-            tup = [get_timestamp(),scan.type, srcip,dstip, ports]
+            tup = [scan.type, srcip,dstip, ports]
             if not slow_scan:
                 if scan.type != 'Idle':
-                    line = '[%s]: Continuation of %s scan from %s to %s (ports:%s)'
+                    line = 'Continuation of %s scan from %s to %s (ports:%s)'
                 else:
-                    tup.append(socket.inet_ntoa(struct.pack('I',scan.zombie)))
-                    line = '[%s]: Continuation of %s scan from %s to %s (ports: %s) using zombie host %s' 
+                    tup.append(ip2quad(scan.zombie))
+                    line = 'Continuation of %s scan from %s to %s (ports: %s) using zombie host %s' 
             else:
                 tup.append(scan.time_avg)
-                line = '[%s]: Continuation of slow %s scan from %s to %s (ports:%s), average timediff %.2fs'                
+                line = 'Continuation of slow %s scan from %s to %s (ports:%s), average timediff %.2fs'                
             
-        if self.scanlog:
-            self.scanlog.write(line % tuple(tup) + '\n')
-            self.scanlog.flush()
 
-        if not self.daemon:
-            print line % tuple(tup)
+        msg = line % tuple(tup)
+        self.log(msg)
 
     def update_ports(self, scan, dport, flags):
 
@@ -189,6 +212,7 @@ class ScanLogger(object):
         is_scan = ((slow_scan and scan.weight >= self.threshold_l) or (not slow_scan and scan.weight >= self.threshold))
         # Possible scan
         maybe_scan = (slow_scan and len(scan.ports)>=3 and len(scan.timediffs)>=4 and (scan.weight < self.threshold_l))
+        not_scan = False
         
         if is_scan or maybe_scan:
             scan.logged = True
@@ -238,21 +262,38 @@ class ScanLogger(object):
                         
                         return False
                 else:
-                    scan.type = self.scan_types.get(scan.flags_or,'unknown')                    
+                    scan.type = self.scan_types.get(scan.flags_or,'unknown')
+                    if scan.type in ('', 'reply'):
+                        not_scan = True
+
+                    # If we see scan flags 22 from A->B, make sure that
+                    # there was no recent full-connect scan from B->A, if
+                    # so this is spurious and should be ignored.
+                    if scan.flags_or == (TH_SYN|TH_ACK|TH_RST) and len(self.recent_scans):
+                        recent1 = self.recent_scans[-1:-2:-1]
+                        for recent in recent1:
+                            # Was not a scan, skip
+                            if not recent.is_scan: continue
+                            if recent.type == 'TCP full-connect' and ((scan.src == recent.dst) and (scan.dst == recent.src)):
+                                # Spurious
+                                self.log("Ignoring spurious TCP full-connect scan from %s" % ' to '.join(scan_ip2quad(scan)))
+                                not_scan = True
+                                break
+
                     # If this is a syn scan, see if there was a recent idle scan
                     # with this as zombie, then ignore it...
-                    if scan.flags_or == TH_SYN and len(self.recent_scans):
-                        recent = self.recent_scans[-1]
-                        if recent.type=='Idle' and scan.src==recent.zombie:
-                            print 'Ignoring mis-interpreted syn scan from zombie host %d to %d...' % (scan.src, scan.dst)
-                            # Remove entry
-                            if slow_scan:
-                                del self.long_scans[scan.hash]
-                            else:
-                                del self.scans[scan.hash]
-
-                            return
-                        
+                    elif scan.flags_or == TH_SYN and len(self.recent_scans):
+                        # Try last 1 scans
+                        recent1 = self.recent_scans[-1:-2:-1]
+                        for recent in recent1:
+                            if recent.type=='Idle' and scan.src==recent.zombie:
+                                self.log('Ignoring mis-interpreted syn scan from zombie host %s' % ' to '.join(scan_ip2quad(scan)))
+                                break
+                            # Reply from B->A for full-connect scan from A->B
+                            elif (recent.type == 'reply' and ((scan.src == recent.dst) and (scan.dst == recent.src))):
+                                scan.type = 'TCP full-connect'
+                                break
+                            
             elif scan.proto==UDP:
                 scan.type = 'UDP'
                 # Reset flags for UDP scan
@@ -264,14 +305,17 @@ class ScanLogger(object):
                     scan.type = 'SCTP COOKIE_ECHO'                    
                 
             # See if this was logged recently
-            scanentry = entry.RecentScanEntry(scan)
+            scanentry = entry.RecentScanEntry(scan, not not_scan)
 
             if scanentry not in self.recent_scans:
-                self.log_scan(scan, slow_scan=slow_scan, unsure=maybe_scan)
+                continuation=False
                 self.recent_scans.append(scanentry)
             else:
-                self.log_scan(scan, True, slow_scan, unsure=maybe_scan)
+                continuation=True
 
+            if not not_scan:
+                self.log_scan(scan, continuation=continuation, slow_scan=slow_scan, unsure=maybe_scan)
+                
             # Remove entry
             if slow_scan:
                 del self.long_scans[scan.hash]
@@ -310,7 +354,6 @@ class ScanLogger(object):
 
             if scan.src != src:
                # Skip packets in reverse direction or invalid protocol
-               # print 'Skipping',key
                return
 
             timediff = curr - scan.timestamp
@@ -349,7 +392,7 @@ class ScanLogger(object):
                                 # but not a scan, so remove entry
                                 if len(lscan.timediffs)>=10:
                                     # print lscan.src, lscan.timediffs, lscan.time_sd 
-                                    # print 'Removing',key,lscan.src,'since not a scan'
+                                    print 'Removing',key,lscan.src,'since not a scan'
                                     del self.long_scans[key]
                                     
                         elif len(lscan.timediffs)>2:
@@ -383,7 +426,7 @@ class ScanLogger(object):
             scan.proto = proto
             self.scans[key] = scan
             
-    def log(self):
+    def loop(self):
         
         pc = pcap.pcap()
         decode = { pcap.DLT_LOOP:dpkt.loopback.Loopback,
@@ -423,7 +466,7 @@ class ScanLogger(object):
             print >>sys.stderr, "fork #2 failed", e
             sys.exit(1)
             
-        self.log()
+        self.loop()
         
     def run(self):
         # If dameon, then create a new thread and wait for it
@@ -432,7 +475,7 @@ class ScanLogger(object):
             self.run_daemon()
         else:
             # Run in foreground
-            self.log()
+            self.loop()
 
 def main():
     
