@@ -36,8 +36,8 @@ import timerlist
 
 __author__ = "pythonhacker"
 __maintainer__ = "pythonhacker"
-__version__ = 0.5
-__modified__ = "Fri Mar 12 16:05:21 CET 2010"
+__version__ = '0.5.1'
+__modified__ = 'Thu Apr  8 19:21:11 IST 2010'
 
 # UDP - in progress...
 
