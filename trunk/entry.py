@@ -69,7 +69,7 @@ class RecentScanEntry(object):
     """ Recent scan entry class, storing
     most recent scan entries """
     
-    def __init__(self, scan):
+    def __init__(self, scan, is_scan=True):
         self.src = scan.src
         self.dst = scan.dst
         self.zombie = scan.zombie
@@ -77,6 +77,7 @@ class RecentScanEntry(object):
         self.flags_or = scan.flags_or
         self.ports = scan.ports[:]
         self.timestamp = scan.timestamp
+        self.is_scan = is_scan
 
     def __eq__(self, entry):
         return ((self.src==entry.src) and (self.dst==entry.dst) and \

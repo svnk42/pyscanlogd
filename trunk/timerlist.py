@@ -48,8 +48,11 @@ class TimerList(list):
     # Access functions
     def __getitem__(self, index):
         item = super(TimerList, self).__getitem__(index)
-        return item[1]
-
+        if type(index) is slice:
+            return [i[1] for i in item]
+        else:
+            return item[1]
+        
     def __setitem__(self,  index, item):
         # Allow only tuples with time-stamps >= current time-stamp as 1st member
         if type(item) == tuple and len(item) == 2  and type(item[0]) == float and item[0]>=time.time():
